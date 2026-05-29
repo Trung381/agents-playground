@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  voxa-callbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Inject build-time environment variables for Next.js static asset compilation
+      args:
+        - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
+        - NEXT_PUBLIC_APP_CONFIG=${NEXT_PUBLIC_APP_CONFIG}
+    container_name: voxa-callbot
+    restart: always
+    ports:
+      - "3000:3000"
+    # Runtime environment variables
+    environment:
+      - PORT=3000
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
+    # Load env file local variables
+    env_file:
+      - .env.local

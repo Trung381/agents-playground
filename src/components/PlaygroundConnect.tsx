@@ -74,7 +74,7 @@ export const PlaygroundConnect = ({
 }: PlaygroundConnectProps) => {
   const [showCloud, setShowCloud] = useState(true);
   const copy = CLOUD_ENABLED
-    ? "Connect to playground with LiveKit Cloud or manually with a URL and token"
+    ? "Connect to playground with VOXA Cloud or manually with a URL and token"
     : "Connect to playground with a URL and token";
   return (
     <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center gap-2">
@@ -93,7 +93,7 @@ export const PlaygroundConnect = ({
                     setShowCloud(true);
                   }}
                 >
-                  LiveKit Cloud
+                  VOXA Cloud
                 </ConnectTab>
                 <ConnectTab
                   active={!showCloud}
