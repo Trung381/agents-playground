@@ -5,6 +5,14 @@ const withNextPluginPreval = createNextPluginPreval();
 const nextConfig = {
   reactStrictMode: false,
   output: "standalone",
+  async rewrites() {
+    return [
+      {
+        source: "/api/voxa/:path*",
+        destination: "https://pbx.voxa.vn/api/:path*",
+      },
+    ];
+  },
 };
 
 module.exports = withNextPluginPreval(nextConfig);

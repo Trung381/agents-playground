@@ -14,6 +14,7 @@ type PlaygroundHeader = {
   accentColor: string;
   connectionState: ConnectionState;
   onConnectClicked: () => void;
+  onLogoutClick?: () => void;
 };
 
 export const PlaygroundHeader = ({
@@ -23,6 +24,7 @@ export const PlaygroundHeader = ({
   accentColor,
   height,
   onConnectClicked,
+  onLogoutClick,
   connectionState,
 }: PlaygroundHeader) => {
   const { config } = useConfig();
@@ -52,6 +54,14 @@ export const PlaygroundHeader = ({
           </a>
         )}
         {config.settings.editable && <SettingsDropdown />}
+        {onLogoutClick && (
+          <button
+            className="flex items-center justify-center px-3 py-1 text-sm rounded-md transition ease-out duration-250 active:scale-[0.98] bg-gray-900 border border-gray-800 text-gray-300 hover:bg-gray-800 hover:text-white"
+            onClick={onLogoutClick}
+          >
+            Logout
+          </button>
+        )}
         <Button
           accentColor={
             connectionState === ConnectionState.Connected ? "red" : accentColor

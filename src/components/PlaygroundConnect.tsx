@@ -1,6 +1,6 @@
 import { CLOUD_ENABLED, CloudConnect } from "../cloud/CloudConnect";
 import { Button } from "./button/Button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TokenSource, TokenSourceConfigurable } from "livekit-client";
 import { PlaygroundConnectProps } from "@/lib/types";
 
@@ -20,17 +20,83 @@ const ConnectTab = ({ active, onClick, children }: any) => {
   );
 };
 
+import { LoadingSVG } from "./button/LoadingSVG";
+
 const TokenConnect = ({
   accentColor,
   onConnectClicked,
 }: PlaygroundConnectProps) => {
-  const [url, setUrl] = useState<string>("");
+  const [url, setUrl] = useState<string>(
+    process.env.NEXT_PUBLIC_LIVEKIT_URL || "wss://livekit.voxa.vn"
+  );
   const [token, setToken] = useState<string>("");
+  const [agentCode, setAgentCode] = useState<string>("");
+  const [isFetchingToken, setIsFetchingToken] = useState<boolean>(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("voxa_agent_code");
+    if (saved) {
+      setAgentCode(saved);
+    }
+  }, []);
+
+  const handleAgentCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setAgentCode(val);
+    localStorage.setItem("voxa_agent_code", val);
+  };
+
+  const fetchToken = async () => {
+    if (!agentCode) return;
+    setIsFetchingToken(true);
+    console.log("[fetchToken] Calling /api/voxa-token with agent_code:", agentCode);
+    try {
+      const res = await fetch("/api/voxa-token", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ agent_code: agentCode }),
+      });
+
+      console.log("[fetchToken] HTTP status:", res.status, res.statusText);
+      const data = await res.json();
+      console.log("[fetchToken] Response:", JSON.stringify(data, null, 2));
+
+      if (!res.ok) {
+        console.error("[fetchToken] ❌ API error:", data.error, data);
+        return;
+      }
+
+      if (data.session?.access_token) {
+        console.log("[fetchToken] ✅ Got room token, prefilling...");
+        setToken(data.session.access_token);
+      } else {
+        console.warn("[fetchToken] ⚠️ No session.access_token in response:", data);
+      }
+    } catch (e) {
+      console.error("[fetchToken] ❌ Fetch error:", e);
+    } finally {
+      setIsFetchingToken(false);
+    }
+  };
 
   return (
     <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center">
       <div className="flex flex-col gap-4 p-8 bg-gray-950 w-full text-white border-t border-gray-900">
         <div className="flex flex-col gap-2">
+          <input
+            value={agentCode}
+            onChange={handleAgentCodeChange}
+            className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-2"
+            placeholder="Agent code..."
+          ></input>
+          <button
+            className="flex items-center justify-center px-3 py-2 text-sm rounded-md transition ease-out duration-250 active:scale-[0.98] w-full bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={fetchToken}
+            disabled={isFetchingToken || !agentCode}
+          >
+            {isFetchingToken ? <LoadingSVG /> : "Get Room Token"}
+          </button>
+          
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -47,6 +113,7 @@ const TokenConnect = ({
         <Button
           accentColor={accentColor}
           className="w-full"
+          disabled={!token || !url}
           onClick={() => {
             const source = TokenSource.literal({
               serverUrl: url,
@@ -57,12 +124,6 @@ const TokenConnect = ({
         >
           Connect
         </Button>
-        <a
-          href="https://livekit.io/"
-          className={`text-xs text-${accentColor}-500 hover:underline`}
-        >
-          Don’t have a URL or token? Try the demo agent!
-        </a>
       </div>
     </div>
   );
