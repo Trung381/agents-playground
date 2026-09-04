@@ -8,22 +8,32 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { agent_code } = req.body;
+  const { agent_code, direction, tenant_id, tenantId } = req.body;
   if (!agent_code) {
     return res.status(400).json({ error: "agent_code is required" });
   }
 
-  const BASE_URL = "https://pbx.voxa.vn/api";
+  const resolvedTenantId =
+    tenant_id !== undefined && tenant_id !== "" && !isNaN(Number(tenant_id))
+      ? Number(tenant_id)
+      : tenantId !== undefined && tenantId !== "" && !isNaN(Number(tenantId))
+      ? Number(tenantId)
+      : 1;
+
+  const BASE_URL =
+    process.env.VOXA_API_BASE_URL ||
+    process.env.CALLYTICS_BASE ||
+    "https://api.app.voxa.vn/api";
 
   try {
     // Step 1: Login
-    console.log("[voxa-token] Step 1: Login to", BASE_URL + "/auth/login");
-    const loginRes = await fetch(`${BASE_URL}/auth/login`, {
+    console.log("[voxa-token] Step 1: Login to", BASE_URL + "/v1/auth/login");
+    const loginRes = await fetch(`${BASE_URL}/v1/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ 
-        username: process.env.VOXA_API_USERNAME, 
-        password: process.env.VOXA_API_PASSWORD 
+      body: JSON.stringify({
+        username: process.env.VOXA_API_USERNAME,
+        password: process.env.VOXA_API_PASSWORD
       }),
     });
 
@@ -51,23 +61,32 @@ export default async function handler(
     console.log("[voxa-token] ✅ Got API token (truncated):", String(apiToken).substring(0, 40) + "...");
 
     // Step 2: Create web session
-    console.log("[voxa-token] Step 2: Create web session for agent:", agent_code);
-    const sessionRes = await fetch(`${BASE_URL}/conversations/web-sessions`, {
+    console.log(
+      `[voxa-token] Step 2: Create web session for agent: ${agent_code} (tenant_id: ${resolvedTenantId}, direction: ${direction || "inbound"})`
+    );
+
+    const sessionPayload: Record<string, any> = {
+      tenant_id: resolvedTenantId,
+      agent_code,
+      channel: "web",
+      external_ref: "manual-web-test",
+      external_user_id: "test-user-001",
+      caller_identity: "web-user-001",
+      metadata: { test: true, source: "manual-curl" },
+      customer: { name: "Anh Trung", phone: "0364757669" },
+    };
+
+    if (direction === "outbound") {
+      sessionPayload.direction = "outbound";
+    }
+
+    const sessionRes = await fetch(`${BASE_URL}/v1/conversations/web-sessions`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${apiToken}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({
-        tenant_id: 1,
-        agent_code,
-        channel: "web",
-        external_ref: "manual-web-test",
-        external_user_id: "test-user-001",
-        caller_identity: "web-user-001",
-        metadata: { test: true, source: "manual-curl" },
-        customer: { name: "Anh Trung", phone: "0364757669" },
-      }),
+      body: JSON.stringify(sessionPayload),
     });
 
     const sessionData = await sessionRes.json();

@@ -1,13 +1,15 @@
 - example api call:
-- customizable variable: "agent_code" (add another html input for it)
+- customizable variables: "agent_code", "direction" ("inbound" or "outbound")
+
+### Inbound:
 ```
 curl --request POST \
-  --url https://pbx.voxa.vn/api/conversations/web-sessions \
-  --header 'authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRlbmFudElkIjoxLCJ1c2VybmFtZSI6InRydW5ndnUiLCJ0ZW5hbnRJc1Jvb3QiOnRydWUsImlzU3VwZXJBZG1pbiI6dHJ1ZSwidXNlckxldmVsIjoiU1VQRVJfQURNSU4iLCJwcmVmZXJyZWRMYW5ndWFnZSI6InZpIiwiZXhwIjoxNzg1MjU2NTMzfQ.-vbO9MOBV9JQkfOveD2peK3zPlm_L5OXkc7L8aTBnwE' \
+  --url https://api.app.voxa.vn/api/v1/conversations/web-sessions \
+  --header 'authorization: Bearer <TOKEN>' \
   --header 'content-type: application/json' \
   --data '{
   "tenant_id": 1,
-  "agent_code": "hang-khong",
+  "agent_code": "taixe247_inbound_exact_payload",
   "channel": "web",
   "external_ref": "manual-web-test",
   "external_user_id": "test-user-001",
@@ -20,6 +22,31 @@ curl --request POST \
     "name": "Anh Trung",
     "phone": "0364757669"
   }
+}'
+```
+
+### Outbound (thêm `"direction": "outbound"`):
+```
+curl --request POST \
+  --url https://api.app.voxa.vn/api/v1/conversations/web-sessions \
+  --header 'authorization: Bearer <TOKEN>' \
+  --header 'content-type: application/json' \
+  --data '{
+  "tenant_id": 1,
+  "agent_code": "taixe247_inbound_exact_payload",
+  "channel": "web",
+  "external_ref": "manual-web-test",
+  "external_user_id": "test-user-001",
+  "caller_identity": "web-user-001",
+  "metadata": {
+    "test": true,
+    "source": "manual-curl"
+  },
+  "customer": {
+    "name": "Anh Trung",
+    "phone": "0364757669"
+  },
+  "direction": "outbound"
 }'
 ```
 
