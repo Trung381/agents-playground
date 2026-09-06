@@ -11,8 +11,8 @@ services:
         - NEXT_PUBLIC_APP_CONFIG=${NEXT_PUBLIC_APP_CONFIG}
     container_name: voxa-callbot
     restart: always
-    ports:
-      - "0.0.0.0:3000:3000"
+    expose:
+      - "3000"
     # Runtime environment variables
     environment:
       - PORT=3000
@@ -23,3 +23,19 @@ services:
     # Load env file local variables
     env_file:
       - .env.local
+
+  auth-proxy:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: voxa-callbot-proxy
+    restart: always
+    ports:
+      - "0.0.0.0:3000:80"
+    environment:
+      - VOXA_API_USERNAME=${VOXA_API_USERNAME:-trungvu}
+      - VOXA_API_PASSWORD=${VOXA_API_PASSWORD:-Trung2004@}
+    env_file:
+      - .env.local
+    depends_on:
+      - voxa-callbot
