@@ -21,6 +21,12 @@ const themeColors = [
 ];
 const inter = Inter({ subsets: ["latin"] });
 
+type ConnectionTarget = {
+  agentCode: string;
+  tenantId: number;
+  direction: "inbound" | "outbound";
+};
+
 type ProductSession = {
   conversation_id: string;
   server_url: string;
@@ -108,17 +114,15 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
 }
 
 function ManualConnect({
-  onSessionCreated,
-  onConnected,
+  onConnect,
+  onLogout,
 }: {
-  onSessionCreated: (conversationId: string) => void;
-  onConnected: (source: TokenSourceConfigurable) => void;
+  onConnect: (target: ConnectionTarget) => Promise<void>;
+  onLogout: () => Promise<void>;
 }) {
   const [agentCode, setAgentCode] = useState("");
   const [tenantId, setTenantId] = useState("1");
   const [direction, setDirection] = useState<"inbound" | "outbound">("inbound");
-  const [serverUrl, setServerUrl] = useState("wss://livekit.voxa.vn");
-  const [roomToken, setRoomToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -131,27 +135,19 @@ function ManualConnect({
     }
   }, []);
 
-  function invalidateToken() {
-    setRoomToken("");
-    setError("");
-  }
-
-  async function getRoomToken() {
-    if (!agentCode.trim() || !tenantId || busy) return;
+  async function connect(event: React.FormEvent) {
+    event.preventDefault();
+    const parsedTenantId = Number(tenantId);
+    if (!agentCode.trim() || !Number.isSafeInteger(parsedTenantId)) return;
     setBusy(true);
     setError("");
     try {
-      const response = await productRequest<ProductSession>("session", {
-        agent_code: agentCode.trim(),
-        tenant_id: Number(tenantId),
+      await onConnect({
+        agentCode: agentCode.trim(),
+        tenantId: parsedTenantId,
         direction,
-        session_id: crypto.randomUUID(),
       });
-      setServerUrl(response.server_url);
-      setRoomToken(response.participant_token);
-      onSessionCreated(response.conversation_id);
     } catch (cause) {
-      setRoomToken("");
       setError(String(cause));
     } finally {
       setBusy(false);
@@ -165,10 +161,13 @@ function ManualConnect({
           <div className="px-10 space-y-2 py-8 border-b border-gray-900">
             <h1 className="text-3xl">Connect to playground</h1>
             <p className="text-sm text-gray-500">
-              Nhập agent, tenant và lấy room token để kết nối
+              Nhập agent và tenant để bắt đầu cuộc gọi
             </p>
           </div>
-          <div className="flex flex-col gap-4 p-8 bg-gray-900/30 text-left">
+          <form
+            onSubmit={connect}
+            className="flex flex-col gap-4 p-8 bg-gray-900/30 text-left"
+          >
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px] gap-3">
               <input
                 className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
@@ -176,11 +175,11 @@ function ManualConnect({
                 onChange={(event) => {
                   setAgentCode(event.target.value);
                   localStorage.setItem("voxa_agent_code", event.target.value);
-                  invalidateToken();
                 }}
                 placeholder="Agent ID / Agent code"
                 aria-label="Agent ID"
                 disabled={busy}
+                required
               />
               <div className="flex items-center border border-gray-800 rounded-sm px-3 bg-gray-900/40">
                 <span className="text-sm text-gray-500 mr-2 whitespace-nowrap">
@@ -195,10 +194,10 @@ function ManualConnect({
                   onChange={(event) => {
                     setTenantId(event.target.value);
                     localStorage.setItem("voxa_tenant_id", event.target.value);
-                    invalidateToken();
                   }}
                   aria-label="Tenant ID"
                   disabled={busy}
+                  required
                 />
               </div>
             </div>
@@ -216,7 +215,6 @@ function ManualConnect({
                   onClick={() => {
                     setDirection(value);
                     localStorage.setItem("voxa_direction", value);
-                    invalidateToken();
                   }}
                   disabled={busy}
                 >
@@ -225,51 +223,52 @@ function ManualConnect({
               ))}
             </div>
 
-            <button
-              className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
-              onClick={getRoomToken}
-              disabled={busy || !agentCode.trim() || !tenantId}
-            >
-              {busy ? "Đang lấy room token..." : "Get Room Token"}
-            </button>
-
-            <input
-              className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
-              value={serverUrl}
-              onChange={(event) => setServerUrl(event.target.value)}
-              placeholder="wss://livekit.voxa.vn"
-              aria-label="LiveKit URL"
-            />
-            <textarea
-              className="min-h-28 resize-y text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
-              value={roomToken}
-              onChange={(event) => setRoomToken(event.target.value)}
-              placeholder="room token..."
-              aria-label="Room token"
-            />
-
             {error && (
               <p role="alert" className="text-xs text-red-400">
                 {error}
               </p>
             )}
-            <button
-              className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-cyan-500 text-gray-950 hover:bg-cyan-400 disabled:opacity-50"
-              onClick={() =>
-                onConnected(
-                  TokenSource.literal({
-                    serverUrl,
-                    participantToken: roomToken,
-                  }),
-                )
-              }
-              disabled={!serverUrl.trim() || !roomToken.trim()}
-            >
-              Connect
-            </button>
-          </div>
+            <div className="grid grid-cols-[auto_1fr] gap-3 pt-1">
+              <button
+                type="button"
+                className="px-5 py-3 text-sm rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    await onLogout();
+                  } catch (cause) {
+                    setError(String(cause));
+                    setBusy(false);
+                  }
+                }}
+                disabled={busy}
+              >
+                Logout
+              </button>
+              <button
+                className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-cyan-500 text-gray-950 hover:bg-cyan-400 disabled:opacity-50"
+                disabled={
+                  busy ||
+                  !agentCode.trim() ||
+                  !Number.isSafeInteger(Number(tenantId)) ||
+                  Number(tenantId) < 1
+                }
+              >
+                {busy ? "Đang kết nối..." : "Connect"}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CheckingSession() {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-black text-sm text-gray-500">
+      Đang khôi phục phiên đăng nhập...
     </div>
   );
 }
@@ -277,28 +276,77 @@ function ManualConnect({
 function HomeInner() {
   const { config } = useConfig();
   const { toastMessage } = useToast();
-  const [signedIn, setSignedIn] = useState(false);
+  const [authState, setAuthState] = useState<
+    "checking" | "signed-in" | "signed-out"
+  >("checking");
   const [tokenSource, setTokenSource] = useState<
     TokenSourceConfigurable | undefined
   >();
   const conversationIdRef = useRef("");
+  const cleanupPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
-  function endConversation() {
+  function endConversation(): Promise<void> {
     const conversationId = conversationIdRef.current;
-    if (!conversationId) return;
-    conversationIdRef.current = "";
-    void fetch("/api/product/end", {
-      method: "POST",
-      credentials: "same-origin",
-      keepalive: true,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversation_id: conversationId }),
+    if (conversationId) {
+      conversationIdRef.current = "";
+      cleanupPromiseRef.current = cleanupPromiseRef.current.then(async () => {
+        await fetch("/api/product/end", {
+          method: "POST",
+          credentials: "same-origin",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation_id: conversationId }),
+        }).catch(() => undefined);
+      });
+    }
+    return cleanupPromiseRef.current;
+  }
+
+  async function createSession(target: ConnectionTarget) {
+    const session = await productRequest<ProductSession>("session", {
+      agent_code: target.agentCode,
+      tenant_id: target.tenantId,
+      direction: target.direction,
+      session_id: crypto.randomUUID(),
     });
+    conversationIdRef.current = session.conversation_id;
+    return {
+      serverUrl: session.server_url,
+      participantToken: session.participant_token,
+    };
+  }
+
+  async function connectTarget(target: ConnectionTarget) {
+    await endConversation();
+    let firstCredentials:
+      | { serverUrl: string; participantToken: string }
+      | undefined = await createSession(target);
+    const source = TokenSource.literal(async () => {
+      if (firstCredentials) {
+        const credentials = firstCredentials;
+        firstCredentials = undefined;
+        return credentials;
+      }
+      await endConversation();
+      return createSession(target);
+    }) as unknown as TokenSourceConfigurable;
+    setTokenSource(source);
   }
 
   useEffect(() => {
-    window.addEventListener("pagehide", endConversation);
-    return () => window.removeEventListener("pagehide", endConversation);
+    let mounted = true;
+    productRequest("auth")
+      .then(() => mounted && setAuthState("signed-in"))
+      .catch(() => mounted && setAuthState("signed-out"));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = () => void endConversation();
+    window.addEventListener("pagehide", cleanup);
+    return () => window.removeEventListener("pagehide", cleanup);
   }, []);
 
   return (
@@ -329,7 +377,9 @@ function HomeInner() {
             </motion.div>
           )}
         </AnimatePresence>
-        {tokenSource ? (
+        {authState === "checking" ? (
+          <CheckingSession />
+        ) : tokenSource ? (
           <Playground
             themeColors={themeColors}
             tokenSource={tokenSource}
@@ -339,23 +389,22 @@ function HomeInner() {
                 ? { agentName: config.settings.agent }
                 : config.agent_dispatch
             }
-            onSessionEnd={endConversation}
-            onLogout={() => {
-              setTokenSource(undefined);
-              setSignedIn(false);
-              void productRequest("logout").catch(() => undefined);
-            }}
+            exitLabel="Quay lại"
+            onSessionEnd={() => void endConversation()}
+            onExit={() => setTokenSource(undefined)}
           />
-        ) : signedIn ? (
+        ) : authState === "signed-in" ? (
           <ManualConnect
-            onSessionCreated={(conversationId) => {
-              endConversation();
-              conversationIdRef.current = conversationId;
+            onConnect={connectTarget}
+            onLogout={async () => {
+              await endConversation();
+              await productRequest("logout");
+              setTokenSource(undefined);
+              setAuthState("signed-out");
             }}
-            onConnected={setTokenSource}
           />
         ) : (
-          <LoginForm onSignedIn={() => setSignedIn(true)} />
+          <LoginForm onSignedIn={() => setAuthState("signed-in")} />
         )}
       </main>
     </>

@@ -57,7 +57,8 @@ export interface PlaygroundProps {
   tokenSource: TokenSourceConfigurable;
   agentOptions?: PartialMessage<RoomAgentDispatch>;
   autoConnect?: boolean;
-  onLogout?: () => void;
+  onExit?: () => void;
+  exitLabel?: string;
   onSessionEnd?: () => void;
 }
 
@@ -90,7 +91,8 @@ export default function Playground({
   tokenSource,
   agentOptions: initialAgentOptions,
   autoConnect,
-  onLogout,
+  onExit,
+  exitLabel,
   onSessionEnd,
 }: PlaygroundProps) {
   const { config, setUserSettings } = useConfig();
@@ -680,12 +682,13 @@ export default function Playground({
           height={headerHeight}
           accentColor={config.settings.theme_color}
           connectionState={connectionState}
-          onLogoutClick={() => {
+          exitLabel={exitLabel}
+          onExitClick={() => {
             if (connectionState === ConnectionState.Connected) {
               session.end();
             }
             onSessionEnd?.();
-            onLogout?.();
+            onExit?.();
           }}
           onConnectClicked={() => {
             if (connectionState === ConnectionState.Disconnected) {
