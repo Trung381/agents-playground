@@ -3,16 +3,7 @@ import type { Timestamp } from "@bufbuild/protobuf";
 import {
   LocalAudioTrack,
   LocalVideoTrack,
-  TokenSourceConfigurable,
 } from "livekit-client";
-
-export type PlaygroundConnectProps = {
-  accentColor: string;
-  onConnectClicked: (
-    tokenSource: TokenSourceConfigurable,
-    shouldAutoConnect?: boolean,
-  ) => void;
-};
 
 export type SessionProps = {
   roomName: string;

@@ -80,6 +80,10 @@ connectivity may use the external TURN relay at `turn.agent.voxa.vn`; this is
 separate from the Callytics application/session path and does not reintroduce
 the retired stunnel or custom PCM input path.
 
+The legacy arbitrary LiveKit-token endpoints and manual URL/token connector are
+not part of the production build. Session creation is available only through
+the authenticated Callytics proxy flow above.
+
 ## Notes
 
 - This playground is currently work in progress. There are known layout/responsive bugs and some features are under tested.
