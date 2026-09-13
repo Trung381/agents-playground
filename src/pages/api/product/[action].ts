@@ -46,19 +46,25 @@ export default async function handler(
     path = "/agent?limit=100";
     method = "GET";
   } else if (action === "session") {
+    const tenantId = Number(req.body?.tenant_id);
+    const direction = req.body?.direction;
     if (
       typeof req.body?.agent_code !== "string" ||
       !req.body.agent_code.trim() ||
+      !Number.isSafeInteger(tenantId) ||
+      tenantId < 1 ||
+      (direction !== "inbound" && direction !== "outbound") ||
       !/^[a-zA-Z0-9_-]{8,64}$/.test(req.body.session_id ?? "")
     ) {
       return res
         .status(400)
-        .json({ message: "Agent and session identity are required" });
+        .json({ message: "Agent, tenant, direction and session are required" });
     }
     path = "/conversations/web-sessions";
     body = {
       agent_code: req.body.agent_code.trim(),
-      direction: "inbound",
+      tenant_id: tenantId,
+      direction,
       session_id: req.body.session_id,
     };
   } else if (action === "end") {
@@ -120,10 +126,8 @@ export default async function handler(
     }
     return res.status(200).json(data);
   } catch {
-    return res
-      .status(502)
-      .json({
-        message: "Unable to reach Callytics; retry using the same session",
-      });
+    return res.status(502).json({
+      message: "Unable to reach Callytics; retry using the same session",
+    });
   }
 }

@@ -1,14 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Inter } from "next/font/google";
 import Head from "next/head";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TokenSource, TokenSourceConfigurable } from "livekit-client";
 
-import { ToastProvider } from "@/components/toast/ToasterProvider";
-import { PlaygroundToast } from "@/components/toast/PlaygroundToast";
 import Playground from "@/components/playground/Playground";
+import { PlaygroundToast } from "@/components/toast/PlaygroundToast";
+import { ToastProvider, useToast } from "@/components/toast/ToasterProvider";
 import { ConfigProvider, useConfig } from "@/hooks/useConfig";
-import { useToast } from "@/components/toast/ToasterProvider";
 
 const themeColors = [
   "cyan",
@@ -22,14 +21,11 @@ const themeColors = [
 ];
 const inter = Inter({ subsets: ["latin"] });
 
-type Agent = {
-  code: string;
-  name?: string;
-  direction?: string;
-  status?: number | string;
+type ProductSession = {
+  conversation_id: string;
+  server_url: string;
+  participant_token: string;
 };
-type Session = { server_url: string; participant_token: string };
-type ProductSession = Session & { conversation_id: string };
 
 async function productRequest<T = any>(
   action: string,
@@ -46,7 +42,7 @@ async function productRequest<T = any>(
   return data;
 }
 
-function LoginForm({ onSignedIn }: { onSignedIn: (agents: Agent[]) => void }) {
+function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -58,18 +54,8 @@ function LoginForm({ onSignedIn }: { onSignedIn: (agents: Agent[]) => void }) {
     setError("");
     try {
       await productRequest("login", { username, password });
-      const response = await productRequest<any>("agents");
-      const list = Array.isArray(response)
-        ? response
-        : (response.items ?? response.data ?? []);
-      onSignedIn(
-        list.filter(
-          (agent: Agent) =>
-            agent.code &&
-            agent.direction === "inbound" &&
-            Number(agent.status) === 1,
-        ),
-      );
+      setPassword("");
+      onSignedIn();
     } catch (cause) {
       setError(String(cause));
     } finally {
@@ -78,7 +64,7 @@ function LoginForm({ onSignedIn }: { onSignedIn: (agents: Agent[]) => void }) {
   }
 
   return (
-    <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center">
+    <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center px-4">
       <div className="flex flex-col gap-4 p-8 bg-gray-950 w-full max-w-[480px] rounded-lg text-white border border-gray-900">
         <div className="px-2 space-y-2 py-2">
           <h1 className="text-2xl">Connect to playground</h1>
@@ -121,54 +107,51 @@ function LoginForm({ onSignedIn }: { onSignedIn: (agents: Agent[]) => void }) {
   );
 }
 
-function CallyticsConnect({
-  agents,
+function ManualConnect({
+  onSessionCreated,
   onConnected,
 }: {
-  agents: Agent[];
-  onConnected: (
-    source: TokenSourceConfigurable,
-    conversationId: string,
-  ) => void;
+  onSessionCreated: (conversationId: string) => void;
+  onConnected: (source: TokenSourceConfigurable) => void;
 }) {
-  const [search, setSearch] = useState("");
   const [agentCode, setAgentCode] = useState("");
+  const [tenantId, setTenantId] = useState("1");
+  const [direction, setDirection] = useState<"inbound" | "outbound">("inbound");
+  const [serverUrl, setServerUrl] = useState("wss://livekit.voxa.vn");
+  const [roomToken, setRoomToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const filteredAgents = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return agents;
-    return agents.filter((agent) =>
-      `${agent.name ?? ""} ${agent.code}`.toLocaleLowerCase().includes(query),
-    );
-  }, [agents, search]);
 
   useEffect(() => {
-    if (
-      agentCode &&
-      !filteredAgents.some((agent) => agent.code === agentCode)
-    ) {
-      setAgentCode("");
+    setAgentCode(localStorage.getItem("voxa_agent_code") ?? "");
+    setTenantId(localStorage.getItem("voxa_tenant_id") ?? "1");
+    const savedDirection = localStorage.getItem("voxa_direction");
+    if (savedDirection === "inbound" || savedDirection === "outbound") {
+      setDirection(savedDirection);
     }
-  }, [agentCode, filteredAgents]);
+  }, []);
 
-  async function connect() {
-    if (!agentCode || busy) return;
+  function invalidateToken() {
+    setRoomToken("");
+    setError("");
+  }
+
+  async function getRoomToken() {
+    if (!agentCode.trim() || !tenantId || busy) return;
     setBusy(true);
     setError("");
     try {
       const response = await productRequest<ProductSession>("session", {
-        agent_code: agentCode,
+        agent_code: agentCode.trim(),
+        tenant_id: Number(tenantId),
+        direction,
         session_id: crypto.randomUUID(),
       });
-      onConnected(
-        TokenSource.literal({
-          serverUrl: response.server_url,
-          participantToken: response.participant_token,
-        }),
-        response.conversation_id,
-      );
+      setServerUrl(response.server_url);
+      setRoomToken(response.participant_token);
+      onSessionCreated(response.conversation_id);
     } catch (cause) {
+      setRoomToken("");
       setError(String(cause));
     } finally {
       setBusy(false);
@@ -176,62 +159,113 @@ function CallyticsConnect({
   }
 
   return (
-    <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center gap-2">
-      <div className="min-h-[540px] w-full max-w-[480px]">
-        <div className="flex flex-col bg-gray-950 w-full rounded-lg text-white border border-gray-900">
-          <div className="px-10 space-y-2 py-6">
-            <h1 className="text-2xl">Connect to playground</h1>
+    <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center px-4 py-6">
+      <div className="w-full max-w-[560px]">
+        <div className="flex flex-col bg-gray-950 w-full rounded-lg text-white border border-gray-900 overflow-hidden">
+          <div className="px-10 space-y-2 py-8 border-b border-gray-900">
+            <h1 className="text-3xl">Connect to playground</h1>
             <p className="text-sm text-gray-500">
-              Chọn agent để bắt đầu cuộc gọi
+              Nhập agent, tenant và lấy room token để kết nối
             </p>
           </div>
           <div className="flex flex-col gap-4 p-8 bg-gray-900/30 text-left">
-            <label className="flex flex-col gap-2">
-              <span className="text-sm text-gray-300">Agent</span>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px] gap-3">
               <input
-                className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-2"
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm agent theo tên hoặc mã..."
-                aria-label="Tìm agent theo tên hoặc mã"
+                className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
+                value={agentCode}
+                onChange={(event) => {
+                  setAgentCode(event.target.value);
+                  localStorage.setItem("voxa_agent_code", event.target.value);
+                  invalidateToken();
+                }}
+                placeholder="Agent ID / Agent code"
+                aria-label="Agent ID"
                 disabled={busy}
               />
-              <span className="text-xs text-gray-500">
-                {search.trim()
-                  ? `${filteredAgents.length}/${agents.length} agent phù hợp`
-                  : `${agents.length} agent khả dụng`}
-              </span>
-              <select
-                className="text-white text-sm bg-gray-950 border border-gray-800 rounded-sm px-3 py-2"
-                value={agentCode}
-                onChange={(event) => setAgentCode(event.target.value)}
-                disabled={busy}
-              >
-                <option value="">Chọn agent</option>
-                {filteredAgents.map((agent) => (
-                  <option value={agent.code} key={agent.code}>
-                    {agent.name ?? agent.code} ({agent.code})
-                  </option>
-                ))}
-                {search.trim() && filteredAgents.length === 0 && (
-                  <option value="" disabled>
-                    Không tìm thấy agent phù hợp
-                  </option>
-                )}
-              </select>
-            </label>
+              <div className="flex items-center border border-gray-800 rounded-sm px-3 bg-gray-900/40">
+                <span className="text-sm text-gray-500 mr-2 whitespace-nowrap">
+                  Tenant:
+                </span>
+                <input
+                  type="number"
+                  className="w-full min-w-0 text-white text-sm bg-transparent outline-none py-3"
+                  value={tenantId}
+                  min={1}
+                  step={1}
+                  onChange={(event) => {
+                    setTenantId(event.target.value);
+                    localStorage.setItem("voxa_tenant_id", event.target.value);
+                    invalidateToken();
+                  }}
+                  aria-label="Tenant ID"
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-gray-900 border border-gray-800 rounded-sm">
+              {(["inbound", "outbound"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`py-2 text-sm font-medium rounded-sm transition-all ${
+                    direction === value
+                      ? "bg-gray-800 text-white shadow-sm border border-gray-700"
+                      : "text-gray-400 hover:text-gray-200"
+                  }`}
+                  onClick={() => {
+                    setDirection(value);
+                    localStorage.setItem("voxa_direction", value);
+                    invalidateToken();
+                  }}
+                  disabled={busy}
+                >
+                  {value === "inbound" ? "Inbound" : "Outbound"}
+                </button>
+              ))}
+            </div>
+
+            <button
+              className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-gray-800 text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+              onClick={getRoomToken}
+              disabled={busy || !agentCode.trim() || !tenantId}
+            >
+              {busy ? "Đang lấy room token..." : "Get Room Token"}
+            </button>
+
+            <input
+              className="text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
+              value={serverUrl}
+              onChange={(event) => setServerUrl(event.target.value)}
+              placeholder="wss://livekit.voxa.vn"
+              aria-label="LiveKit URL"
+            />
+            <textarea
+              className="min-h-28 resize-y text-white text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-3"
+              value={roomToken}
+              onChange={(event) => setRoomToken(event.target.value)}
+              placeholder="room token..."
+              aria-label="Room token"
+            />
+
             {error && (
               <p role="alert" className="text-xs text-red-400">
                 {error}
               </p>
             )}
             <button
-              className="flex items-center justify-center px-3 py-2 text-sm rounded-md bg-cyan-500 text-gray-950 hover:bg-cyan-400 disabled:opacity-50"
-              onClick={connect}
-              disabled={busy || !agentCode}
+              className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-cyan-500 text-gray-950 hover:bg-cyan-400 disabled:opacity-50"
+              onClick={() =>
+                onConnected(
+                  TokenSource.literal({
+                    serverUrl,
+                    participantToken: roomToken,
+                  }),
+                )
+              }
+              disabled={!serverUrl.trim() || !roomToken.trim()}
             >
-              {busy ? "Đang tạo phiên..." : "Connect"}
+              Connect
             </button>
           </div>
         </div>
@@ -243,7 +277,7 @@ function CallyticsConnect({
 function HomeInner() {
   const { config } = useConfig();
   const { toastMessage } = useToast();
-  const [agents, setAgents] = useState<Agent[] | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [tokenSource, setTokenSource] = useState<
     TokenSourceConfigurable | undefined
   >();
@@ -278,12 +312,6 @@ function HomeInner() {
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-        <meta
-          property="og:image"
-          content="https://livekit.io/images/og/agents-playground.png"
-        />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <main
@@ -314,20 +342,20 @@ function HomeInner() {
             onSessionEnd={endConversation}
             onLogout={() => {
               setTokenSource(undefined);
-              setAgents(null);
+              setSignedIn(false);
               void productRequest("logout").catch(() => undefined);
             }}
           />
-        ) : agents ? (
-          <CallyticsConnect
-            agents={agents}
-            onConnected={(source, conversationId) => {
+        ) : signedIn ? (
+          <ManualConnect
+            onSessionCreated={(conversationId) => {
+              endConversation();
               conversationIdRef.current = conversationId;
-              setTokenSource(source);
             }}
+            onConnected={setTokenSource}
           />
         ) : (
-          <LoginForm onSignedIn={setAgents} />
+          <LoginForm onSignedIn={() => setSignedIn(true)} />
         )}
       </main>
     </>
