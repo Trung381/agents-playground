@@ -318,18 +318,10 @@ function HomeInner() {
 
   async function connectTarget(target: ConnectionTarget) {
     await endConversation();
-    let firstCredentials:
-      | { serverUrl: string; participantToken: string }
-      | undefined = await createSession(target);
-    const source = TokenSource.literal(async () => {
-      if (firstCredentials) {
-        const credentials = firstCredentials;
-        firstCredentials = undefined;
-        return credentials;
-      }
+    const source = TokenSource.custom(async () => {
       await endConversation();
       return createSession(target);
-    }) as unknown as TokenSourceConfigurable;
+    });
     setTokenSource(source);
   }
 
