@@ -9,6 +9,7 @@ services:
       args:
         - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
         - NEXT_PUBLIC_APP_CONFIG=${NEXT_PUBLIC_APP_CONFIG}
+        - NEXT_PUBLIC_LIVEKIT_ICE_TRANSPORT_POLICY=${NEXT_PUBLIC_LIVEKIT_ICE_TRANSPORT_POLICY:-relay}
     container_name: voxa-callbot
     restart: always
     expose:
@@ -20,6 +21,7 @@ services:
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
+      - NEXT_PUBLIC_LIVEKIT_ICE_TRANSPORT_POLICY=${NEXT_PUBLIC_LIVEKIT_ICE_TRANSPORT_POLICY:-relay}
     # Load env file local variables
     env_file:
       - .env.local

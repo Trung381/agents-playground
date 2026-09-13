@@ -35,6 +35,7 @@ import {
 } from "@livekit/components-react";
 import {
   ConnectionState,
+  RoomConnectOptions,
   TokenSourceConfigurable,
   TokenSourceFetchOptions,
   Track,
@@ -64,6 +65,23 @@ const headerHeight = 56;
 function generateRandomRoomName() {
   return `room-${Math.random().toString(36).substring(2, 10)}`;
 }
+
+// LiveKit returns the configured ICE/TURN servers as part of the room join
+// response. The browser must not receive a static TURN credential from the
+// frontend. The policy is the only client-side choice we make here:
+// production defaults to relay so browser media uses the canonical coturn
+// endpoint configured by LiveKit, while an explicit `all` can be used for a
+// controlled direct-path diagnostic.
+const liveKitIceTransportPolicy: RTCIceTransportPolicy =
+  process.env.NEXT_PUBLIC_LIVEKIT_ICE_TRANSPORT_POLICY === "all"
+    ? "all"
+    : "relay";
+
+const liveKitRoomConnectOptions: RoomConnectOptions = {
+  rtcConfig: {
+    iceTransportPolicy: liveKitIceTransportPolicy,
+  },
+};
 
 export default function Playground({
   logo,
@@ -131,7 +149,7 @@ export default function Playground({
     if (session.isConnected) {
       return;
     }
-    session.start();
+    session.start({ roomConnectOptions: liveKitRoomConnectOptions });
     setHasConnected(true);
   }, [session]);
 
