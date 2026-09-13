@@ -56,6 +56,7 @@ export interface PlaygroundProps {
   tokenSource: TokenSourceConfigurable;
   agentOptions?: PartialMessage<RoomAgentDispatch>;
   autoConnect?: boolean;
+  onLogout?: () => void;
 }
 
 const headerHeight = 56;
@@ -70,6 +71,7 @@ export default function Playground({
   tokenSource,
   agentOptions: initialAgentOptions,
   autoConnect,
+  onLogout,
 }: PlaygroundProps) {
   const { config, setUserSettings } = useConfig();
 
@@ -547,6 +549,13 @@ export default function Playground({
             ) : null}
           </ConfigurationPanelItem>
         )}
+        {config.settings.outputs.audio && (
+          <ConfigurationPanelItem
+            title="Audio Output"
+            deviceSelectorKind="audiooutput"
+          >
+          </ConfigurationPanelItem>
+        )}
         <div className="w-full">
           <ConfigurationPanelItem title="Color">
             <ColorPicker
@@ -652,6 +661,12 @@ export default function Playground({
           height={headerHeight}
           accentColor={config.settings.theme_color}
           connectionState={connectionState}
+          onLogoutClick={() => {
+            if (connectionState === ConnectionState.Connected) {
+              session.end();
+            }
+            onLogout?.();
+          }}
           onConnectClicked={() => {
             if (connectionState === ConnectionState.Disconnected) {
               startSession();

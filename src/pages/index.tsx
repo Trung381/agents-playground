@@ -88,6 +88,9 @@ export function HomeInner() {
                 ? { agentName: config.settings.agent }
                 : config.agent_dispatch
             }
+            onLogout={() => {
+              setTokenSource(undefined);
+            }}
           />
         ) : (
           <PlaygroundConnect

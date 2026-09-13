@@ -8,6 +8,7 @@ type ConfigurationPanelItemProps = {
   title: string;
   children?: ReactNode;
   source?: ToggleSource;
+  deviceSelectorKind?: MediaDeviceKind;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
 };
@@ -16,6 +17,7 @@ export const ConfigurationPanelItem: React.FC<ConfigurationPanelItemProps> = ({
   children,
   title,
   source,
+  deviceSelectorKind,
   collapsible = false,
   defaultCollapsed = false,
 }) => {
@@ -39,6 +41,9 @@ export const ConfigurationPanelItem: React.FC<ConfigurationPanelItemProps> = ({
                 <PlaygroundDeviceSelector kind="audioinput" />
               )}
             </span>
+          )}
+          {deviceSelectorKind && !source && (
+            <PlaygroundDeviceSelector kind={deviceSelectorKind} />
           )}
           {collapsible && (
             <button

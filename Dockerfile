@@ -19,7 +19,10 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 
 # Install both production and devDependencies (required for compiling Next.js)
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Increase network timeout and retries for slow connections
+RUN pnpm config set fetch-timeout 600000 && \
+    pnpm config set fetch-retries 5 && \
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ==============================================================================
 # STAGE 3: Build application
