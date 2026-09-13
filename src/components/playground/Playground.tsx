@@ -58,6 +58,7 @@ export interface PlaygroundProps {
   agentOptions?: PartialMessage<RoomAgentDispatch>;
   autoConnect?: boolean;
   onLogout?: () => void;
+  onSessionEnd?: () => void;
 }
 
 const headerHeight = 56;
@@ -90,6 +91,7 @@ export default function Playground({
   agentOptions: initialAgentOptions,
   autoConnect,
   onLogout,
+  onSessionEnd,
 }: PlaygroundProps) {
   const { config, setUserSettings } = useConfig();
 
@@ -571,8 +573,7 @@ export default function Playground({
           <ConfigurationPanelItem
             title="Audio Output"
             deviceSelectorKind="audiooutput"
-          >
-          </ConfigurationPanelItem>
+          ></ConfigurationPanelItem>
         )}
         <div className="w-full">
           <ConfigurationPanelItem title="Color">
@@ -683,6 +684,7 @@ export default function Playground({
             if (connectionState === ConnectionState.Connected) {
               session.end();
             }
+            onSessionEnd?.();
             onLogout?.();
           }}
           onConnectClicked={() => {
@@ -690,6 +692,7 @@ export default function Playground({
               startSession();
             } else if (connectionState === ConnectionState.Connected) {
               session.end();
+              onSessionEnd?.();
               // Generate a new random room name for next connect so the
               // SDK fetches a fresh token. User-set names are preserved.
               if (!userRoomName) {
