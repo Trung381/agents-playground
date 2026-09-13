@@ -57,6 +57,29 @@ pnpm run dev
 - Send video, audio, or text to your agent
 - Configurable settings panel to work with your agent
 
+## Voxa production connection flow
+
+The production build at `https://playground.voxa.vn` uses the Callytics
+session API rather than exposing a LiveKit URL or room token in the browser.
+
+1. Sign in with a Callytics account. The access token and rotating refresh token
+   are stored only in `Secure`, `HttpOnly`, `SameSite=Strict` cookies.
+2. Enter the agent ID/code, tenant ID, and `Inbound` or `Outbound`, then choose
+   `Connect`.
+3. The server-side proxy creates a new Callytics web session and returns only
+   the LiveKit connection details required by the client. The session API
+   retries once after a `401` by rotating the refresh token.
+4. `Quay lại` returns to the agent/tenant selector without signing out.
+   `Logout` is available only on that selector screen.
+5. When the call ends, connecting again creates a new conversation, room and
+   LiveKit participant token for the same selected target; old tokens are never
+   reused.
+
+The browser connects to the original LiveKit Playground UI. Browser WebRTC
+connectivity may use the external TURN relay at `turn.agent.voxa.vn`; this is
+separate from the Callytics application/session path and does not reintroduce
+the retired stunnel or custom PCM input path.
+
 ## Notes
 
 - This playground is currently work in progress. There are known layout/responsive bugs and some features are under tested.
