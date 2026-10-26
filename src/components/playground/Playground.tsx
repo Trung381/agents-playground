@@ -19,6 +19,10 @@ import {
 } from "@/components/playground/PlaygroundTile";
 import { useRemoteSession } from "@/hooks/useRemoteSession";
 import { useConfig } from "@/hooks/useConfig";
+import {
+  HistoryConversation,
+  upsertConversation,
+} from "@/lib/conversationHistory";
 import { useUplinkLatency } from "@/hooks/useUplinkLatency";
 import { AttributeItem } from "@/lib/types";
 import { PartialMessage } from "@bufbuild/protobuf";
@@ -42,7 +46,14 @@ import {
 } from "livekit-client";
 import { RoomAgentDispatch } from "livekit-server-sdk";
 import { QRCodeSVG } from "qrcode.react";
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import tailwindTheme from "../../lib/tailwindTheme.preval";
 import { RpcPanel } from "./RpcPanel";
 
@@ -60,6 +71,10 @@ export interface PlaygroundProps {
   onExit?: () => void;
   exitLabel?: string;
   onSessionEnd?: () => void;
+  historyTarget?: Pick<
+    HistoryConversation,
+    "agentCode" | "tenantId" | "direction"
+  >;
 }
 
 const headerHeight = 56;
@@ -94,6 +109,7 @@ export default function Playground({
   onExit,
   exitLabel,
   onSessionEnd,
+  historyTarget,
 }: PlaygroundProps) {
   const { config, setUserSettings } = useConfig();
 
@@ -129,6 +145,31 @@ export default function Playground({
   const { connectionState } = session;
   const agent = useAgent(session);
   const messages = useSessionMessages(session);
+
+  // Persist the transcript to this browser's localStorage as it grows, so the
+  // conversation is kept even if the tab is closed mid-call.
+  const historyIdRef = useRef(crypto.randomUUID());
+  const historyStartedAtRef = useRef(Date.now());
+  useEffect(() => {
+    if (!historyTarget || messages.messages.length === 0) return;
+    const saved = messages.messages
+      .filter((message) => message.message?.trim())
+      .map((message) => ({
+        id: message.id,
+        role: message.from?.isLocal ? ("user" as const) : ("agent" as const),
+        name: message.from?.name ?? "",
+        text: message.message,
+        timestamp: message.timestamp,
+      }));
+    if (saved.length === 0) return;
+    upsertConversation({
+      id: historyIdRef.current,
+      ...historyTarget,
+      startedAt: historyStartedAtRef.current,
+      updatedAt: Date.now(),
+      messages: saved,
+    });
+  }, [messages.messages, historyTarget]);
 
   const {
     events: clientEvents,

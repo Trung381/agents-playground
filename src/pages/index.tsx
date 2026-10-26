@@ -8,6 +8,7 @@ import Playground from "@/components/playground/Playground";
 import { PlaygroundToast } from "@/components/toast/PlaygroundToast";
 import { ToastProvider, useToast } from "@/components/toast/ToasterProvider";
 import { ConfigProvider, useConfig } from "@/hooks/useConfig";
+import { ConversationHistory } from "@/components/history/ConversationHistory";
 
 const themeColors = [
   "cyan",
@@ -116,9 +117,11 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
 function ManualConnect({
   onConnect,
   onLogout,
+  onShowHistory,
 }: {
   onConnect: (target: ConnectionTarget) => Promise<void>;
   onLogout: () => Promise<void>;
+  onShowHistory: () => void;
 }) {
   const [agentCode, setAgentCode] = useState("");
   const [tenantId, setTenantId] = useState("1");
@@ -228,6 +231,14 @@ function ManualConnect({
                 {error}
               </p>
             )}
+            <button
+              type="button"
+              className="px-5 py-3 text-sm rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+              onClick={onShowHistory}
+              disabled={busy}
+            >
+              Lịch sử hội thoại
+            </button>
             <div className="grid grid-cols-[auto_1fr] gap-3 pt-1">
               <button
                 type="button"
@@ -282,6 +293,8 @@ function HomeInner() {
   const [tokenSource, setTokenSource] = useState<
     TokenSourceConfigurable | undefined
   >();
+  const [target, setTarget] = useState<ConnectionTarget | undefined>();
+  const [showHistory, setShowHistory] = useState(false);
   const conversationIdRef = useRef("");
   const cleanupPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -318,6 +331,7 @@ function HomeInner() {
 
   async function connectTarget(target: ConnectionTarget) {
     await endConversation();
+    setTarget(target);
     const source = TokenSource.custom(async () => {
       await endConversation();
       return createSession(target);
@@ -381,6 +395,7 @@ function HomeInner() {
                 ? { agentName: config.settings.agent }
                 : config.agent_dispatch
             }
+            historyTarget={target}
             exitLabel="Quay lại"
             onSessionEnd={() => void endConversation()}
             onExit={() => setTokenSource(undefined)}
@@ -388,6 +403,7 @@ function HomeInner() {
         ) : authState === "signed-in" ? (
           <ManualConnect
             onConnect={connectTarget}
+            onShowHistory={() => setShowHistory(true)}
             onLogout={async () => {
               await endConversation();
               await productRequest("logout");
@@ -397,6 +413,9 @@ function HomeInner() {
           />
         ) : (
           <LoginForm onSignedIn={() => setAuthState("signed-in")} />
+        )}
+        {showHistory && (
+          <ConversationHistory onClose={() => setShowHistory(false)} />
         )}
       </main>
     </>
