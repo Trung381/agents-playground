@@ -50,20 +50,21 @@ export type UserSettings = {
 // Fallback if NEXT_PUBLIC_APP_CONFIG is not set
 const defaultConfig: AppConfig = {
   title: "VOXA Callbot",
-  description: "A virtual workbench for testing multimodal AI agents.",
+  description: "Môi trường thử nghiệm callbot thoại.",
   video_fit: "contain",
   settings: {
     editable: true,
     theme_color: "cyan",
     chat: true,
+    // Callbot sessions are voice only: video/camera/screen panels start hidden.
     inputs: {
-      camera: true,
-      screen: true,
+      camera: false,
+      screen: false,
       mic: true,
     },
     outputs: {
       audio: true,
-      video: true,
+      video: false,
     },
   },
   show_qr: false,

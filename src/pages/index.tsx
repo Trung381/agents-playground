@@ -34,6 +34,20 @@ type ProductSession = {
   participant_token: string;
 };
 
+class ProductRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+// Show only the message, not "Error: message" as String(cause) would.
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
 async function productRequest<T = any>(
   action: string,
   body?: unknown,
@@ -45,7 +59,12 @@ async function productRequest<T = any>(
     body: JSON.stringify(body ?? {}),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.message ?? "Request failed");
+  if (!response.ok) {
+    throw new ProductRequestError(
+      data.message ?? "Yêu cầu thất bại",
+      response.status,
+    );
+  }
   return data;
 }
 
@@ -64,7 +83,7 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
       setPassword("");
       onSignedIn();
     } catch (cause) {
-      setError(String(cause));
+      setError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -74,7 +93,7 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
     <div className="flex left-0 top-0 w-full h-full bg-black/80 items-center justify-center text-center px-4">
       <div className="flex flex-col gap-4 p-8 bg-gray-950 w-full max-w-[480px] rounded-lg text-white border border-gray-900">
         <div className="px-2 space-y-2 py-2">
-          <h1 className="text-2xl">Connect to playground</h1>
+          <h1 className="text-2xl">Đăng nhập Playground</h1>
           <p className="text-sm text-gray-500">
             Đăng nhập bằng tài khoản Callytics
           </p>
@@ -151,7 +170,7 @@ function ManualConnect({
         direction,
       });
     } catch (cause) {
-      setError(String(cause));
+      setError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -162,7 +181,7 @@ function ManualConnect({
       <div className="w-full max-w-[560px]">
         <div className="flex flex-col bg-gray-950 w-full rounded-lg text-white border border-gray-900 overflow-hidden">
           <div className="px-10 space-y-2 py-8 border-b border-gray-900">
-            <h1 className="text-3xl">Connect to playground</h1>
+            <h1 className="text-3xl">Playground Callbot</h1>
             <p className="text-sm text-gray-500">
               Nhập agent và tenant để bắt đầu cuộc gọi
             </p>
@@ -249,13 +268,13 @@ function ManualConnect({
                   try {
                     await onLogout();
                   } catch (cause) {
-                    setError(String(cause));
+                    setError(errorMessage(cause));
                     setBusy(false);
                   }
                 }}
                 disabled={busy}
               >
-                Logout
+                Đăng xuất
               </button>
               <button
                 className="flex items-center justify-center px-3 py-3 text-sm rounded-md bg-cyan-500 text-gray-950 hover:bg-cyan-400 disabled:opacity-50"
@@ -266,7 +285,7 @@ function ManualConnect({
                   Number(tenantId) < 1
                 }
               >
-                {busy ? "Đang kết nối..." : "Connect"}
+                {busy ? "Đang kết nối..." : "Kết nối"}
               </button>
             </div>
           </form>
@@ -331,8 +350,28 @@ function HomeInner() {
 
   async function connectTarget(target: ConnectionTarget) {
     await endConversation();
+    // Create the first session before entering the room so that a bad agent
+    // code / tenant is reported on the connect form instead of opening a
+    // "Disconnected" room. The token source then hands this session to the
+    // room once, so prepareConnection/connect do not create it twice.
+    let firstSession: Awaited<ReturnType<typeof createSession>> | undefined;
+    try {
+      firstSession = await createSession(target);
+    } catch (cause) {
+      if (cause instanceof ProductRequestError && cause.status === 404) {
+        throw new Error(
+          `Không tìm thấy agent "${target.agentCode}" ở tenant ${target.tenantId}`,
+        );
+      }
+      throw cause;
+    }
     setTarget(target);
     const source = TokenSource.custom(async () => {
+      if (firstSession) {
+        const session = firstSession;
+        firstSession = undefined;
+        return session;
+      }
       await endConversation();
       return createSession(target);
     });

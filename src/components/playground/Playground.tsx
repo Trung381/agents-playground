@@ -79,6 +79,24 @@ export interface PlaygroundProps {
 
 const headerHeight = 56;
 
+// The RPC tester is a LiveKit developer tool; callbot voice sessions do not use
+// it, so it is hidden unless explicitly enabled at build time.
+const SHOW_RPC_PANEL = process.env.NEXT_PUBLIC_PLAYGROUND_SHOW_RPC === "1";
+
+function connectionStateLabel(state: ConnectionState): string {
+  switch (state) {
+    case ConnectionState.Connected:
+      return "Đã kết nối";
+    case ConnectionState.Connecting:
+      return "Đang kết nối";
+    case ConnectionState.Reconnecting:
+    case ConnectionState.SignalReconnecting:
+      return "Đang kết nối lại";
+    default:
+      return "Chưa kết nối";
+  }
+}
+
 function generateRandomRoomName() {
   return `room-${Math.random().toString(36).substring(2, 10)}`;
 }
@@ -345,7 +363,7 @@ export default function Playground({
 
   const handleRpcCall = useCallback(async () => {
     if (!agent.internal.agentParticipant) {
-      throw new Error("No agent or room available");
+      throw new Error("Chưa có agent hoặc phòng");
     }
 
     const response = await session.room.localParticipant.performRpc({
@@ -393,15 +411,15 @@ export default function Playground({
     return (
       <div className="flex flex-col h-full w-full items-start overflow-y-auto">
         {config.description && (
-          <ConfigurationPanelItem title="Description">
+          <ConfigurationPanelItem title="Mô tả">
             {config.description}
           </ConfigurationPanelItem>
         )}
 
-        <ConfigurationPanelItem title="Room">
+        <ConfigurationPanelItem title="Phòng">
           <div className="flex flex-col gap-2">
             <EditableNameValueRow
-              name="Room name"
+              name="Tên phòng"
               value={
                 connectionState === ConnectionState.Connected
                   ? session.room.name
@@ -415,17 +433,16 @@ export default function Playground({
                   roomName: value || generateRandomRoomName(),
                 }));
               }}
-              placeholder="Auto"
+              placeholder="Tự động"
               editable={connectionState !== ConnectionState.Connected}
             />
             <NameValueRow
-              name="Status"
+              name="Trạng thái"
               value={
                 connectionState === ConnectionState.Connecting ? (
                   <LoadingSVG diameter={16} strokeWidth={2} />
                 ) : (
-                  connectionState.charAt(0).toUpperCase() +
-                  connectionState.slice(1)
+                  connectionStateLabel(connectionState)
                 )
               }
               valueColor={
@@ -440,7 +457,7 @@ export default function Playground({
         <ConfigurationPanelItem title="Agent">
           <div className="flex flex-col gap-2">
             <EditableNameValueRow
-              name="Agent name"
+              name="Tên agent"
               value={tokenFetchOptions?.agentName ?? ""}
               valueColor={`${config.settings.theme_color}-500`}
               onValueChange={(value) => {
@@ -449,18 +466,18 @@ export default function Playground({
                   agentName: value,
                 });
               }}
-              placeholder="None"
+              placeholder="Không có"
               editable={connectionState !== ConnectionState.Connected}
             />
             <NameValueRow
-              name="Identity"
+              name="Định danh"
               value={
                 agent.internal.agentParticipant ? (
                   agent.internal.agentParticipant.identity
                 ) : connectionState === ConnectionState.Connected ? (
                   <LoadingSVG diameter={12} strokeWidth={2} />
                 ) : (
-                  "No agent connected"
+                  "Chưa có agent kết nối"
                 )
               }
               valueColor={
@@ -485,24 +502,24 @@ export default function Playground({
                 />
               )}
             <p className="text-xs text-gray-500 text-right">
-              Set an agent name to use{" "}
+              Đặt tên agent để dùng{" "}
               <a
                 href="https://docs.livekit.io/agents/server/agent-dispatch/#explicit"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-500 hover:text-gray-300 underline"
               >
-                explicit dispatch
+                điều phối agent tường minh
               </a>
               .
             </p>
           </div>
         </ConfigurationPanelItem>
 
-        <ConfigurationPanelItem title="User">
+        <ConfigurationPanelItem title="Người dùng">
           <div className="flex flex-col gap-2">
             <EditableNameValueRow
-              name="Name"
+              name="Tên"
               value={
                 connectionState === ConnectionState.Connected
                   ? session.room.localParticipant.name || ""
@@ -515,11 +532,11 @@ export default function Playground({
                   participantName: value,
                 });
               }}
-              placeholder="Auto"
+              placeholder="Tự động"
               editable={connectionState !== ConnectionState.Connected}
             />
             <EditableNameValueRow
-              name="Identity"
+              name="Định danh"
               value={
                 connectionState === ConnectionState.Connected
                   ? session.room.localParticipant.identity
@@ -532,7 +549,7 @@ export default function Playground({
                   participantIdentity: value,
                 });
               }}
-              placeholder="Auto"
+              placeholder="Tự động"
               editable={connectionState !== ConnectionState.Connected}
             />
             <AttributesInspector
@@ -555,7 +572,7 @@ export default function Playground({
         {connectionState === ConnectionState.Connected &&
           config.settings.inputs.screen && (
             <ConfigurationPanelItem
-              title="Screen"
+              title="Chia sẻ màn hình"
               source={Track.Source.ScreenShare}
             >
               {localScreenTrack ? (
@@ -575,12 +592,14 @@ export default function Playground({
                 </div>
               ) : (
                 <div className="flex items-center justify-center text-gray-700 text-center w-full h-full">
-                  Press the button above to share your screen.
+                  Nhấn nút phía trên để chia sẻ màn hình.
                 </div>
               )}
             </ConfigurationPanelItem>
           )}
-        {connectionState === ConnectionState.Connected && agent.isConnected && (
+        {SHOW_RPC_PANEL &&
+          connectionState === ConnectionState.Connected &&
+          agent.isConnected && (
           <RpcPanel
             config={config}
             rpcMethod={rpcMethod}
@@ -604,7 +623,7 @@ export default function Playground({
         )}
         {config.settings.inputs.mic && (
           <ConfigurationPanelItem
-            title="Microphone"
+            title="Micro"
             source={Track.Source.Microphone}
           >
             {session.local.microphoneTrack ? (
@@ -614,12 +633,12 @@ export default function Playground({
         )}
         {config.settings.outputs.audio && (
           <ConfigurationPanelItem
-            title="Audio Output"
+            title="Loa ra"
             deviceSelectorKind="audiooutput"
           ></ConfigurationPanelItem>
         )}
         <div className="w-full">
-          <ConfigurationPanelItem title="Color">
+          <ConfigurationPanelItem title="Màu">
             <ColorPicker
               colors={themeColors}
               selectedColor={config.settings.theme_color}
@@ -633,7 +652,7 @@ export default function Playground({
         </div>
         {config.show_qr && (
           <div className="w-full">
-            <ConfigurationPanelItem title="QR Code">
+            <ConfigurationPanelItem title="Mã QR">
               <QRCodeSVG value={window.location.href} width="128" />
             </ConfigurationPanelItem>
           </div>
@@ -680,7 +699,7 @@ export default function Playground({
 
   if (config.settings.outputs.audio) {
     mobileTabs.push({
-      title: "Audio",
+      title: "Âm thanh",
       content: (
         <PlaygroundTile
           className="w-full h-full grow"
@@ -694,13 +713,13 @@ export default function Playground({
 
   if (config.settings.chat) {
     mobileTabs.push({
-      title: "Chat",
+      title: "Trò chuyện",
       content: chatTileContent,
     });
   }
 
   mobileTabs.push({
-    title: "Settings",
+    title: "Cài đặt",
     content: (
       <PlaygroundTile
         padding={false}
@@ -768,7 +787,7 @@ export default function Playground({
           >
             {config.settings.outputs.video && (
               <PlaygroundTile
-                title="Agent Video"
+                title="Video agent"
                 className="w-full h-full grow"
                 childrenClassName="justify-center"
               >
@@ -777,7 +796,7 @@ export default function Playground({
             )}
             {config.settings.outputs.audio && (
               <PlaygroundTile
-                title="Agent Audio"
+                title="Âm thanh agent"
                 className="w-full h-full grow"
                 childrenClassName="justify-center"
               >
@@ -788,7 +807,7 @@ export default function Playground({
 
           {config.settings.chat && (
             <PlaygroundTile
-              title="Chat"
+              title="Trò chuyện"
               className="h-full grow basis-1/4 hidden lg:flex"
             >
               {chatTileContent}
@@ -816,7 +835,7 @@ export default function Playground({
           />
         )}
         <RoomAudioRenderer />
-        <StartAudio label="Click to enable audio playback" />
+        <StartAudio label="Nhấn để bật âm thanh" />
       </div>
     </SessionProvider>
   );

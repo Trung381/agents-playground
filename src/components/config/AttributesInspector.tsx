@@ -293,7 +293,7 @@ export const AttributesInspector: React.FC<AttributesInspectorProps> = ({
               value={metadata}
               onChange={(e) => onMetadataChange?.(e.target.value)}
               className="w-full text-gray-400 text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-2 font-mono mb-4"
-              placeholder="Enter metadata..."
+              placeholder="Nhập metadata..."
               rows={3}
             />
           ))}

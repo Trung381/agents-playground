@@ -114,7 +114,7 @@ export const ChatMessageInput = ({
             message.length > 0 ? 100 : 25
           } pointer-events-${message.length > 0 ? "auto" : "none"}`}
         >
-          Send
+          Gửi
         </button>
       </div>
     </div>

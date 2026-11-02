@@ -48,7 +48,7 @@ export const ChatTile = ({ messages, accentColor, onSend }: ChatTileProps) => {
       </div>
       <ChatMessageInput
         height={inputHeight}
-        placeholder="Type a message"
+        placeholder="Nhập tin nhắn"
         accentColor={accentColor}
         onSend={onSend}
       />

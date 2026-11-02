@@ -29,14 +29,14 @@ export const AttributeRow: React.FC<AttributeRowProps> = ({
               ? "border-red-500 text-red-400"
               : "border-gray-800 text-gray-400"
           }`}
-          placeholder="Name"
+          placeholder="Tên"
           disabled={disabled}
         />
         <input
           value={attribute.value}
           onChange={(e) => onValueChange(attribute.id, e.target.value)}
           className="flex-1 min-w-0 text-gray-400 text-sm bg-transparent border border-gray-800 rounded-sm px-3 py-1 font-mono"
-          placeholder="Value"
+          placeholder="Giá trị"
           disabled={disabled}
         />
         {onRemove && (

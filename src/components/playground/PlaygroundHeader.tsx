@@ -26,7 +26,7 @@ export const PlaygroundHeader = ({
   height,
   onConnectClicked,
   onExitClick,
-  exitLabel = "Logout",
+  exitLabel = "Đăng xuất",
   connectionState,
 }: PlaygroundHeader) => {
   const { config } = useConfig();
@@ -76,9 +76,9 @@ export const PlaygroundHeader = ({
           {connectionState === ConnectionState.Connecting ? (
             <LoadingSVG />
           ) : connectionState === ConnectionState.Connected ? (
-            "Disconnect"
+            "Ngắt kết nối"
           ) : (
-            "Connect"
+            "Kết nối"
           )}
         </Button>
       </div>
